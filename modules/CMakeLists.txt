@@ -21,3 +21,4 @@ endif ()
 add_subdirectory(image)
 add_subdirectory(reroute)
 
+add_subdirectory(replay)
