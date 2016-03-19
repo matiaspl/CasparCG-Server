@@ -78,12 +78,14 @@ set(HEADERS
 		memcpy.h
 		memset.h
 		memshfl.h
+		no_init_proxy.h
 		param.h
 		polling_filesystem_monitor.h
 		prec_timer.h
 		ptree.h
 		scope_exit.h
 		semaphore.h
+		software_version.h
 		stdafx.h
 		thread_info.h
 		timer.h

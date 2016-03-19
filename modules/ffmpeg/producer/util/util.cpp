@@ -149,7 +149,7 @@ core::pixel_format_desc pixel_format_desc(PixelFormat pix_fmt, int width, int he
 	}
 }
 
-core::mutable_frame make_frame(const void* tag, const spl::shared_ptr<AVFrame>& decoded_frame, double fps, core::frame_factory& frame_factory, const core::audio_channel_layout& channel_layout)
+core::mutable_frame make_frame(const void* tag, const spl::shared_ptr<AVFrame>& decoded_frame, core::frame_factory& frame_factory, const core::audio_channel_layout& channel_layout)
 {			
 	static tbb::concurrent_unordered_map<int64_t, tbb::concurrent_queue<std::shared_ptr<SwsContext>>> sws_contvalid_exts_;
 	
@@ -205,8 +205,7 @@ core::mutable_frame make_frame(const void* tag, const spl::shared_ptr<AVFrame>& 
 									boost::errinfo_api_function("sws_getContext"));
 		}	
 		
-		spl::shared_ptr<AVFrame> av_frame(avcodec_alloc_frame(), av_free);	
-		avcodec_get_frame_defaults(av_frame.get());			
+		auto av_frame = create_frame();
 		if(target_pix_fmt == PIX_FMT_BGRA)
 		{
 			auto size = avpicture_fill(reinterpret_cast<AVPicture*>(av_frame.get()), write.image_data(0).begin(), PIX_FMT_BGRA, width, height);
@@ -273,8 +272,7 @@ spl::shared_ptr<AVFrame> make_av_frame(core::mutable_frame& frame)
 
 spl::shared_ptr<AVFrame> make_av_frame(std::array<uint8_t*, 4> data, const core::pixel_format_desc& pix_desc)
 {
-	spl::shared_ptr<AVFrame> av_frame(avcodec_alloc_frame(), av_free);	
-	avcodec_get_frame_defaults(av_frame.get());
+	auto av_frame = create_frame();
 	
 	auto planes		 = pix_desc.planes;
 	auto format		 = pix_desc.format;
@@ -360,77 +358,83 @@ AVRational fix_time_base(AVRational time_base)
 }
 
 double read_fps(AVFormatContext& context, double fail_value)
-{						
+{
+	auto framerate = read_framerate(context, boost::rational<int>(static_cast<int>(fail_value * 1000000.0), 1000000));
+	
+	return static_cast<double>(framerate.numerator()) / static_cast<double>(framerate.denominator());
+}
+
+boost::rational<int> read_framerate(AVFormatContext& context, const boost::rational<int>& fail_value)
+{
 	auto video_index = av_find_best_stream(&context, AVMEDIA_TYPE_VIDEO, -1, -1, 0, 0);
 	auto audio_index = av_find_best_stream(&context, AVMEDIA_TYPE_AUDIO, -1, -1, 0, 0);
-	
-	if(video_index > -1)
+
+	if (video_index > -1)
 	{
 		const auto video_context = context.streams[video_index]->codec;
-		const auto video_stream  = context.streams[video_index];
+		const auto video_stream = context.streams[video_index];
 
 		auto frame_rate_time_base = video_stream->avg_frame_rate;
 		std::swap(frame_rate_time_base.num, frame_rate_time_base.den);
 
 		if (is_sane_fps(frame_rate_time_base))
 		{
-			return static_cast<double>(frame_rate_time_base.den) / static_cast<double>(frame_rate_time_base.num);
+			return boost::rational<int>(frame_rate_time_base.den, frame_rate_time_base.num);
 		}
 
 		AVRational time_base = video_context->time_base;
 
-		if(boost::filesystem::path(context.filename).extension().string() == ".flv")
+		if (boost::filesystem::path(context.filename).extension().string() == ".flv")
 		{
 			try
 			{
 				auto meta = read_flv_meta_info(context.filename);
-				return boost::lexical_cast<double>(meta["framerate"]);
+				return boost::rational<int>(static_cast<int>(boost::lexical_cast<double>(meta["framerate"]) * 1000000.0), 1000000);
 			}
-			catch(...)
+			catch (...)
 			{
-				return 0.0;
+				return fail_value;
 			}
 		}
 		else
 		{
 			time_base.num *= video_context->ticks_per_frame;
 
-			if(!is_sane_fps(time_base))
-			{			
+			if (!is_sane_fps(time_base))
+			{
 				time_base = fix_time_base(time_base);
 
-				if(!is_sane_fps(time_base) && audio_index > -1)
+				if (!is_sane_fps(time_base) && audio_index > -1)
 				{
 					auto& audio_context = *context.streams[audio_index]->codec;
-					auto& audio_stream  = *context.streams[audio_index];
+					auto& audio_stream = *context.streams[audio_index];
 
 					double duration_sec = audio_stream.duration / static_cast<double>(audio_context.sample_rate);
-								
+
 					time_base.num = static_cast<int>(duration_sec*100000.0);
-					time_base.den = static_cast<int>(video_stream->nb_frames*100000);
+					time_base.den = static_cast<int>(video_stream->nb_frames * 100000);
 				}
 			}
 		}
-		
-		double fps = static_cast<double>(time_base.den) / static_cast<double>(time_base.num);
 
-		double closest_fps = 0.0;
+		boost::rational<int> fps(time_base.den, time_base.num);
+		boost::rational<int> closest_fps(0);
 
 		for (auto video_mode : enum_constants<core::video_format>())
 		{
 			auto format = core::video_format_desc(core::video_format(video_mode));
 
-			double diff1 = std::abs(format.fps - fps);
-			double diff2 = std::abs(closest_fps - fps);
+			auto diff1 = boost::abs(boost::rational<int>(format.time_scale, format.duration) - fps);
+			auto diff2 = boost::abs(closest_fps - fps);
 
-			if(diff1 < diff2)
-				closest_fps = format.fps;
+			if (diff1 < diff2)
+				closest_fps = boost::rational<int>(format.time_scale, format.duration);
 		}
-	
+
 		return closest_fps;
 	}
 
-	return fail_value;	
+	return fail_value;
 }
 
 void fix_meta_data(AVFormatContext& context)
@@ -479,7 +483,10 @@ spl::shared_ptr<AVPacket> create_packet()
 
 spl::shared_ptr<AVFrame> create_frame()
 {	
-	spl::shared_ptr<AVFrame> frame(avcodec_alloc_frame(), av_free);
+	spl::shared_ptr<AVFrame> frame(av_frame_alloc(), [](AVFrame* p)
+	{
+		av_frame_free(&p);
+	});
 	avcodec_get_frame_defaults(frame.get());
 	return frame;
 }
@@ -487,7 +494,7 @@ spl::shared_ptr<AVFrame> create_frame()
 spl::shared_ptr<AVCodecContext> open_codec(AVFormatContext& context, enum AVMediaType type, int& index, bool single_threaded)
 {	
 	AVCodec* decoder;
-	index = THROW_ON_ERROR2(av_find_best_stream(&context, type, -1, -1, &decoder, 0), "");
+	index = THROW_ON_ERROR2(av_find_best_stream(&context, type, index, -1, &decoder, 0), "");
 	//if(strcmp(decoder->name, "prores") == 0 && decoder->next && strcmp(decoder->next->name, "prores_lgpl") == 0)
 	//	decoder = decoder->next;
 
@@ -638,10 +645,8 @@ std::wstring probe_stem(const std::wstring& stem, bool only_video)
 	return L"";
 }
 
-core::audio_channel_layout get_audio_channel_layout(const AVCodecContext& codec_context, const std::wstring& channel_layout_spec)
+core::audio_channel_layout get_audio_channel_layout(int num_channels, std::uint64_t layout, const std::wstring& channel_layout_spec)
 {
-	auto num_channels = codec_context.channels;
-
 	if (!channel_layout_spec.empty())
 	{
 		if (boost::contains(channel_layout_spec, L":")) // Custom on the fly layout specified.
@@ -655,18 +660,18 @@ core::audio_channel_layout get_audio_channel_layout(const AVCodecContext& codec_
 		}
 		else // Preconfigured named channel layout selected.
 		{
-			auto layout = core::audio_channel_layout_repository::get_default()->get_layout(channel_layout_spec);
+			auto channel_layout = core::audio_channel_layout_repository::get_default()->get_layout(channel_layout_spec);
 
-			if (!layout)
+			if (!channel_layout)
 				CASPAR_THROW_EXCEPTION(user_error() << msg_info(L"No channel layout with name " + channel_layout_spec + L" registered"));
 
-			layout->num_channels = num_channels;
+			channel_layout->num_channels = num_channels;
 
-			return *layout;
+			return *channel_layout;
 		}
 	}
 
-	if (!codec_context.channel_layout)
+	if (!layout)
 	{
 		if (num_channels == 1)
 			return core::audio_channel_layout(num_channels, L"mono", L"FC");
@@ -682,7 +687,7 @@ core::audio_channel_layout get_audio_channel_layout(const AVCodecContext& codec_
 	// than the most common (5.1, mono and stereo) types.
 
 	// Based on information in https://ffmpeg.org/ffmpeg-utils.html#Channel-Layout
-	switch (codec_context.channel_layout)
+	switch (layout)
 	{
 	case AV_CH_LAYOUT_MONO:
 		return core::audio_channel_layout(num_channels, L"mono",			L"FC");

@@ -126,11 +126,6 @@ struct image_producer : public core::frame_producer_base
 		return frame_;
 	}
 
-	core::draw_frame create_thumbnail_frame() override
-	{
-		return frame_;
-	}
-
 	core::constraints& pixel_constraints() override
 	{
 		return constraints_;
@@ -265,7 +260,7 @@ spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer
 
 	auto ext = std::find_if(g_extensions.begin(), g_extensions.end(), [&](const std::wstring& ex) -> bool
 	{
-		auto file = caspar::find_case_insensitive(boost::filesystem::path(filename).replace_extension(ex).wstring());
+		auto file = caspar::find_case_insensitive(boost::filesystem::path(filename).wstring() + ex);
 
 		return static_cast<bool>(file);
 	});
@@ -277,21 +272,26 @@ spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer
 }
 
 
-spl::shared_ptr<core::frame_producer> create_thumbnail_producer(const core::frame_producer_dependencies& dependencies, const std::vector<std::wstring>& params)
+core::draw_frame create_thumbnail(const core::frame_producer_dependencies& dependencies, const std::wstring& media_file)
 {
-	std::wstring filename = env::media_folder() + params.at(0);
+	std::wstring filename = env::media_folder() + media_file;
 
 	auto ext = std::find_if(g_extensions.begin(), g_extensions.end(), [&](const std::wstring& ex) -> bool
 	{
-		auto file = caspar::find_case_insensitive(boost::filesystem::path(filename).replace_extension(ex).wstring());
+		auto file = caspar::find_case_insensitive(boost::filesystem::path(filename).wstring() + ex);
 
 		return static_cast<bool>(file);
 	});
 
 	if (ext == g_extensions.end())
-		return core::frame_producer::empty();
+		return core::draw_frame::empty();
 
-	return spl::make_shared<image_producer>(dependencies.frame_factory, *caspar::find_case_insensitive(filename + *ext), true);
+	spl::shared_ptr<core::frame_producer> producer = spl::make_shared<image_producer>(
+			dependencies.frame_factory,
+			*caspar::find_case_insensitive(filename + *ext),
+			true);
+	
+	return producer->receive();
 }
 
 }}

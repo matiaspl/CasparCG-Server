@@ -16,17 +16,31 @@
 * You should have received a copy of the GNU General Public License
 * along with CasparCG. If not, see <http://www.gnu.org/licenses/>.
 *
-* Author: Cambell Prince, cambell.prince@gmail.com
+* Author: Helge Norberg, helge.norberg@svt.se
 */
 
 #pragma once
 
+#include "../../fwd.h"
+
 #include <common/memory.h>
 
-#include <core/fwd.h>
+#include <core/producer/frame_producer.h>
 
-namespace caspar { namespace reroute {
+#include <string>
+#include <vector>
 
-spl::shared_ptr<core::frame_producer> create_layer_producer(const spl::shared_ptr<core::video_channel>& channel, int layer, int frames_delay);
+#include <boost/rational.hpp>
+
+namespace caspar { namespace core {
+
+void describe_framerate_producer(help_sink& sink);
+
+spl::shared_ptr<frame_producer> create_framerate_producer(
+		spl::shared_ptr<frame_producer> source,
+		boost::rational<int> source_framerate,
+		boost::rational<int> destination_framerate,
+		field_mode destination_fieldmode,
+		std::vector<int> destination_audio_cadence);
 
 }}
