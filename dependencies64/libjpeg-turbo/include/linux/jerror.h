@@ -1,1 +1,1 @@
-/media/krzysiek/MagazynExt4/src/CasparCG-Server/dependencies64/libjpeg-turbo/include/jerror.h
+../win32/jerror.h
