@@ -16,17 +16,21 @@
 * You should have received a copy of the GNU General Public License
 * along with CasparCG. If not, see <http://www.gnu.org/licenses/>.
 *
-* Author: Cambell Prince, cambell.prince@gmail.com
+* Author: Helge Norberg, helge.norberg@svt.se
 */
 
 #pragma once
 
 #include <common/memory.h>
 
-#include <core/fwd.h>
+#include <boost/rational.hpp>
 
-namespace caspar { namespace reroute {
+#include <string>
+#include <functional>
+#include <cstdint>
 
-spl::shared_ptr<core::frame_producer> create_layer_producer(const spl::shared_ptr<core::video_channel>& channel, int layer, int frames_delay);
+namespace caspar { namespace ffmpeg {
+
+spl::shared_ptr<struct ffmpeg_pipeline_backend> create_internal_pipeline();
 
 }}

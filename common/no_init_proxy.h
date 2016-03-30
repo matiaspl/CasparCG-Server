@@ -16,17 +16,23 @@
 * You should have received a copy of the GNU General Public License
 * along with CasparCG. If not, see <http://www.gnu.org/licenses/>.
 *
-* Author: Cambell Prince, cambell.prince@gmail.com
+* Author: Robert Nagy, ronag89@gmail.com
 */
 
 #pragma once
 
-#include <common/memory.h>
+namespace caspar {
 
-#include <core/fwd.h>
+template<typename T>
+struct no_init_proxy
+{
+	T value;
 
-namespace caspar { namespace reroute {
+	no_init_proxy()
+	{
+		static_assert(sizeof(no_init_proxy) == sizeof(T), "invalid size");
+		static_assert(__alignof(no_init_proxy) == __alignof(T), "invalid alignment");
+	}
+};
 
-spl::shared_ptr<core::frame_producer> create_layer_producer(const spl::shared_ptr<core::video_channel>& channel, int layer, int frames_delay);
-
-}}
+}

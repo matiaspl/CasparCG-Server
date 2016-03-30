@@ -24,6 +24,7 @@
 #include "decklink_consumer.h"
 
 #include "../util/util.h"
+#include "../decklink.h"
 
 #include "../decklink_api.h"
 
@@ -40,11 +41,14 @@
 #include <common/diagnostics/graph.h>
 #include <common/except.h>
 #include <common/memshfl.h>
+#include <common/memcpy.h>
+#include <common/no_init_proxy.h>
 #include <common/array.h>
 #include <common/future.h>
 #include <common/cache_aligned_vector.h>
 #include <common/timer.h>
 #include <common/param.h>
+#include <common/software_version.h>
 
 #include <tbb/concurrent_queue.h>
 
@@ -117,8 +121,9 @@ struct configuration
 	}
 };
 
+template <typename Configuration>
 void set_latency(
-		const com_iface_ptr<IDeckLinkConfiguration>& config,
+		const com_iface_ptr<Configuration>& config,
 		configuration::latency_t latency,
 		const std::wstring& print)
 {
@@ -168,19 +173,32 @@ void set_keyer(
 
 class decklink_frame : public IDeckLinkVideoFrame
 {
-	tbb::atomic<int>				ref_count_;
-	core::const_frame				frame_;
-	const core::video_format_desc	format_desc_;
+	tbb::atomic<int>								ref_count_;
+	core::const_frame								frame_;
+	const core::video_format_desc					format_desc_;
 
-	const bool						key_only_;
-	cache_aligned_vector<uint8_t>	data_;
+	const bool										key_only_;
+	bool											needs_to_copy_;
+	cache_aligned_vector<no_init_proxy<uint8_t>>	data_;
 public:
-	decklink_frame(core::const_frame frame, const core::video_format_desc& format_desc, bool key_only)
+	decklink_frame(core::const_frame frame, const core::video_format_desc& format_desc, bool key_only, bool will_attempt_dma)
 		: frame_(frame)
 		, format_desc_(format_desc)
 		, key_only_(key_only)
 	{
 		ref_count_ = 0;
+
+		bool dma_transfer_from_gl_buffer_impossible;
+
+#if !defined(_MSC_VER)
+		// On Linux Decklink cannot DMA transfer from memory returned by glMapBuffer (at least on nvidia)
+		dma_transfer_from_gl_buffer_impossible = true;
+#else
+		// On Windows it is possible.
+		dma_transfer_from_gl_buffer_impossible = false;
+#endif
+
+		needs_to_copy_ = will_attempt_dma && dma_transfer_from_gl_buffer_impossible;
 	}
 	
 	// IUnknown
@@ -216,7 +234,7 @@ public:
 		{
 			if(static_cast<int>(frame_.image_data().size()) != format_desc_.size)
 			{
-				data_.resize(format_desc_.size, 0);
+				data_.resize(format_desc_.size);
 				*buffer = data_.data();
 			}
 			else if(key_only_)
@@ -229,7 +247,16 @@ public:
 				*buffer = data_.data();
 			}
 			else
+			{
 				*buffer = const_cast<uint8_t*>(frame_.image_data().begin());
+
+				if (needs_to_copy_)
+				{
+					data_.resize(frame_.image_data().size());
+					fast_memcpy(data_.data(), *buffer, frame_.image_data().size());
+					*buffer = data_.data();
+				}
+			}
 		}
 		catch(...)
 		{
@@ -256,16 +283,17 @@ public:
 	}
 };
 
+template <typename Configuration>
 struct key_video_context : public IDeckLinkVideoOutputCallback, boost::noncopyable
 {
-	const configuration										config_;
-	com_ptr<IDeckLink>										decklink_					= get_device(config_.key_device_index());
-	com_iface_ptr<IDeckLinkOutput>							output_						= iface_cast<IDeckLinkOutput>(decklink_);
-	com_iface_ptr<IDeckLinkKeyer>							keyer_						= iface_cast<IDeckLinkKeyer>(decklink_);
-	com_iface_ptr<IDeckLinkAttributes>						attributes_					= iface_cast<IDeckLinkAttributes>(decklink_);
-	com_iface_ptr<IDeckLinkConfiguration>					configuration_				= iface_cast<IDeckLinkConfiguration>(decklink_);
-	tbb::atomic<int64_t>									current_presentation_delay_;
-	tbb::atomic<int64_t>									scheduled_frames_completed_;
+	const configuration					config_;
+	com_ptr<IDeckLink>					decklink_					= get_device(config_.key_device_index());
+	com_iface_ptr<IDeckLinkOutput>		output_						= iface_cast<IDeckLinkOutput>(decklink_);
+	com_iface_ptr<IDeckLinkKeyer>		keyer_						= iface_cast<IDeckLinkKeyer>(decklink_);
+	com_iface_ptr<IDeckLinkAttributes>	attributes_					= iface_cast<IDeckLinkAttributes>(decklink_);
+	com_iface_ptr<Configuration>		configuration_				= iface_cast<Configuration>(decklink_);
+	tbb::atomic<int64_t>				current_presentation_delay_;
+	tbb::atomic<int64_t>				scheduled_frames_completed_;
 
 	key_video_context(const configuration& config, const std::wstring& print)
 		: config_(config)
@@ -326,6 +354,7 @@ struct key_video_context : public IDeckLinkVideoOutputCallback, boost::noncopyab
 	}
 };
 
+template <typename Configuration>
 struct decklink_consumer : public IDeckLinkVideoOutputCallback, public IDeckLinkAudioOutputCallback, boost::noncopyable
 {		
 	const int											channel_index_;
@@ -333,7 +362,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback, public IDeckLink
 
 	com_ptr<IDeckLink>									decklink_				= get_device(config_.device_index);
 	com_iface_ptr<IDeckLinkOutput>						output_					= iface_cast<IDeckLinkOutput>(decklink_);
-	com_iface_ptr<IDeckLinkConfiguration>				configuration_			= iface_cast<IDeckLinkConfiguration>(decklink_);
+	com_iface_ptr<Configuration>						configuration_			= iface_cast<Configuration>(decklink_);
 	com_iface_ptr<IDeckLinkKeyer>						keyer_					= iface_cast<IDeckLinkKeyer>(decklink_);
 	com_iface_ptr<IDeckLinkAttributes>					attributes_				= iface_cast<IDeckLinkAttributes>(decklink_);
 
@@ -343,6 +372,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback, public IDeckLink
 	tbb::atomic<bool>									is_running_;
 		
 	const std::wstring									model_name_				= get_model_name(decklink_);
+	bool												will_attempt_dma_;
 	const core::video_format_desc						format_desc_;
 	const core::audio_channel_layout					in_channel_layout_;
 	const core::audio_channel_layout					out_channel_layout_		= config_.get_adjusted_layout(in_channel_layout_);
@@ -365,7 +395,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback, public IDeckLink
 	reference_signal_detector							reference_signal_detector_	{ output_ };
 	tbb::atomic<int64_t>								current_presentation_delay_;
 	tbb::atomic<int64_t>								scheduled_frames_completed_;
-	std::unique_ptr<key_video_context>					key_context_;
+	std::unique_ptr<key_video_context<Configuration>>	key_context_;
 
 public:
 	decklink_consumer(
@@ -390,7 +420,7 @@ public:
 		audio_frame_buffer_.set_capacity((format_desc.fps > 50.0) ? 2 : 1);
 
 		if (config.keyer == configuration::keyer_t::external_separate_device_keyer)
-			key_context_.reset(new key_video_context(config, print()));
+			key_context_.reset(new key_video_context<Configuration>(config, print()));
 
 		graph_->set_color("tick-time", diagnostics::color(0.0f, 0.6f, 0.9f));	
 		graph_->set_color("late-frame", diagnostics::color(0.6f, 0.3f, 0.3f));
@@ -407,7 +437,7 @@ public:
 		graph_->set_text(print());
 		diagnostics::register_graph(graph_);
 		
-		enable_video(get_display_mode(output_, format_desc_.format, bmdFormat8BitBGRA, bmdVideoOutputFlagDefault));
+		enable_video(get_display_mode(output_, format_desc_.format, bmdFormat8BitBGRA, bmdVideoOutputFlagDefault, will_attempt_dma_));
 				
 		if(config.embedded_audio)
 			enable_audio();
@@ -600,12 +630,12 @@ public:
 	{
 		if (key_context_)
 		{
-			auto key_frame = wrap_raw<com_ptr, IDeckLinkVideoFrame>(new decklink_frame(frame, format_desc_, true));
+			auto key_frame = wrap_raw<com_ptr, IDeckLinkVideoFrame>(new decklink_frame(frame, format_desc_, true, will_attempt_dma_));
 			if (FAILED(key_context_->output_->ScheduleVideoFrame(get_raw(key_frame), video_scheduled_, format_desc_.duration, format_desc_.time_scale)))
 				CASPAR_LOG(error) << print() << L" Failed to schedule key video.";
 		}
 
-		auto fill_frame = wrap_raw<com_ptr, IDeckLinkVideoFrame>(new decklink_frame(frame, format_desc_, config_.key_only));
+		auto fill_frame = wrap_raw<com_ptr, IDeckLinkVideoFrame>(new decklink_frame(frame, format_desc_, config_.key_only, will_attempt_dma_));
 		if (FAILED(output_->ScheduleVideoFrame(get_raw(fill_frame), video_scheduled_, format_desc_.duration, format_desc_.time_scale)))
 			CASPAR_LOG(error) << print() << L" Failed to schedule fill video.";
 
@@ -670,13 +700,14 @@ public:
 	}
 };
 
+template <typename Configuration>
 struct decklink_consumer_proxy : public core::frame_consumer
 {
-	core::monitor::subject				monitor_subject_;
-	const configuration					config_;
-	std::unique_ptr<decklink_consumer>	consumer_;
-	core::video_format_desc				format_desc_;
-	executor							executor_;
+	core::monitor::subject								monitor_subject_;
+	const configuration									config_;
+	std::unique_ptr<decklink_consumer<Configuration>>	consumer_;
+	core::video_format_desc								format_desc_;
+	executor											executor_;
 public:
 
 	decklink_consumer_proxy(const configuration& config)
@@ -708,7 +739,7 @@ public:
 		executor_.invoke([=]
 		{
 			consumer_.reset();
-			consumer_.reset(new decklink_consumer(config_, format_desc, channel_layout, channel_index));			
+			consumer_.reset(new decklink_consumer<Configuration>(config_, format_desc, channel_layout, channel_index));			
 		});
 	}
 	
@@ -765,7 +796,21 @@ public:
 	{
 		return monitor_subject_;
 	}
-};	
+};
+
+const software_version<3>& get_driver_version()
+{
+	static software_version<3> version(u8(get_version()));
+
+	return version;
+}
+
+const software_version<3> get_new_configuration_api_version()
+{
+	static software_version<3> NEW_CONFIGURATION_API("10.2");
+
+	return NEW_CONFIGURATION_API;
+}
 
 void describe_consumer(core::help_sink& sink, const core::help_repository& repo)
 {
@@ -840,7 +885,12 @@ spl::shared_ptr<core::frame_consumer> create_consumer(
 		config.out_channel_layout = *found_layout;
 	}
 
-	return spl::make_shared<decklink_consumer_proxy>(config);
+	bool old_configuration_api = get_driver_version() < get_new_configuration_api_version();
+
+	if (old_configuration_api)
+		return spl::make_shared<decklink_consumer_proxy<IDeckLinkConfiguration_v10_2>>(config);
+	else
+		return spl::make_shared<decklink_consumer_proxy<IDeckLinkConfiguration>>(config);
 }
 
 spl::shared_ptr<core::frame_consumer> create_preconfigured_consumer(
@@ -882,7 +932,12 @@ spl::shared_ptr<core::frame_consumer> create_preconfigured_consumer(
 	config.embedded_audio		= ptree.get(L"embedded-audio",	config.embedded_audio);
 	config.base_buffer_depth	= ptree.get(L"buffer-depth",	config.base_buffer_depth);
 
-	return spl::make_shared<decklink_consumer_proxy>(config);
+	bool old_configuration_api = get_driver_version() < get_new_configuration_api_version();
+
+	if (old_configuration_api)
+		return spl::make_shared<decklink_consumer_proxy<IDeckLinkConfiguration_v10_2>>(config);
+	else
+		return spl::make_shared<decklink_consumer_proxy<IDeckLinkConfiguration>>(config);
 }
 
 }}
