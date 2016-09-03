@@ -456,12 +456,13 @@ public:
 
 			CefWindowInfo window_info;
 
-			window_info.SetTransparentPainting(true);
-			window_info.SetAsOffScreen(nullptr);
-			//window_info.SetAsWindowless(nullptr, true);
+			//window_info.SetTransparentPainting(true);
+			//window_info.SetAsOffScreen(nullptr);
+			window_info.SetAsWindowless(0, true);
 					
 			CefBrowserSettings browser_settings;
 			browser_settings.web_security = cef_state_t::STATE_DISABLED;
+			browser_settings.webgl = cef_state_t::STATE_ENABLED;
 			CefBrowserHost::CreateBrowser(window_info, client_.get(), url, browser_settings, nullptr);
 		});
 	}
