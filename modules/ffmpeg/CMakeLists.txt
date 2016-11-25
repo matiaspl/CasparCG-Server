@@ -3,7 +3,6 @@ project (ffmpeg)
 
 set(SOURCES
 		consumer/ffmpeg_consumer.cpp
-		consumer/streaming_consumer.cpp
 
 		producer/audio/audio_decoder.cpp
 
@@ -25,13 +24,10 @@ set(SOURCES
 		audio_channel_remapper.cpp
 		ffmpeg.cpp
 		ffmpeg_error.cpp
-		ffmpeg_pipeline.cpp
-		ffmpeg_pipeline_backend_internal.cpp
 		StdAfx.cpp
 )
 set(HEADERS
 		consumer/ffmpeg_consumer.h
-		consumer/streaming_consumer.h
 
 		producer/audio/audio_decoder.h
 
@@ -53,9 +49,6 @@ set(HEADERS
 
 		ffmpeg.h
 		ffmpeg_error.h
-		ffmpeg_pipeline.h
-		ffmpeg_pipeline_backend.h
-		ffmpeg_pipeline_backend_internal.h
 		StdAfx.h
 )
 
@@ -90,6 +83,7 @@ if (MSVC)
 			avcodec.lib
 			avutil.lib
 			avfilter.lib
+			avdevice.lib
 			swscale.lib
 			swresample.lib
 	)
@@ -103,6 +97,7 @@ else()
 			avcodec.so
 			avutil.so
 			avfilter.so
+			avdevice.so
 			swscale.so
 			swresample.so
 			postproc.so
