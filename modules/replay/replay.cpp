@@ -77,11 +77,11 @@ void init(core::module_dependencies dependencies)
 	}
 	catch (...)
 	{
-		CASPAR_LOG(error) << "[replay] JPEG lib test exception" << std::endl;
+		CASPAR_LOG(error) << "[replay] JPEG lib test exception";
 	}
 	jpeg_CreateCompress(&cinfo, -1, sizeof(cinfo)); // Pass version = -1 to always force error
 
-	CASPAR_LOG(info) << "[replay] Using libjpeg" << (jpeg_is_turbo == 1 ? "-turbo" : "") << " version " << jpeg_version << std::endl;
+	CASPAR_LOG(info) << "[replay] Using libjpeg" << (jpeg_is_turbo == 1 ? "-turbo" : "") << " version " << jpeg_version;
 
 #ifndef CASPAR_2_1
 	core::register_consumer_factory([](const core::parameters& params){return replay::create_consumer(params);});
