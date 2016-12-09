@@ -35,6 +35,8 @@
 #include <common/utility/string.h>
 #else
 #include <core/module_dependencies.h>
+#include <core/producer/media_info/media_info.h>
+#include <core/frame/draw_frame.h>
 #endif
 namespace caspar { namespace replay {
 
@@ -89,6 +91,19 @@ void init(core::module_dependencies dependencies)
 #else
 	dependencies.consumer_registry->register_consumer_factory(L"Replay Consumer", create_consumer, describe_consumer);
 	dependencies.producer_registry->register_producer_factory(L"Replay Producer", create_producer, describe_producer);
+    dependencies.producer_registry->register_thumbnail_producer(create_thumbnail);
+    dependencies.media_info_repo->register_extractor([](const std::wstring& file, const std::wstring& extension, core::media_info& info)
+    {
+        if (extension == L".MAV"
+            || extension == L".IDX")
+        {
+            info.clip_type = L"REPLAY";
+
+            return true;
+        }
+
+        return false;
+    });
 #endif
 }
 

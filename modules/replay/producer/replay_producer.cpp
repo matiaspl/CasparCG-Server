@@ -1015,6 +1015,11 @@ struct replay_producer : public core::frame_producer_base
 };
 
 #ifdef CASPAR_2_1
+core::draw_frame create_thumbnail(const core::frame_producer_dependencies& dependencies, const std::wstring& media_file)
+{
+    return core::draw_frame::empty();
+}
+
 void describe_producer(core::help_sink & sink, const core::help_repository & repo)
 {
 	CASPAR_LOG(error) << L" describe_producer ";

@@ -46,6 +46,7 @@ namespace replay {
 #ifndef CASPAR_2_1
 	safe_ptr<core::frame_producer> create_producer(const safe_ptr<core::frame_factory>& frame_factory, const core::parameters& params);
 #else
+    core::draw_frame create_thumbnail(const core::frame_producer_dependencies& dependencies, const std::wstring& media_file);
 	void describe_producer(core::help_sink& sink, const core::help_repository& repo);
 	spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer_dependencies& dependencies, const std::vector<std::wstring>& params);
 #endif
