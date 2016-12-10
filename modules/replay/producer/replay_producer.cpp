@@ -39,15 +39,6 @@
 #include <boost/algorithm/string.hpp>
 #include <tbb/concurrent_queue.h>
 
-#ifndef CASPAR_2_1
-#include <tbb/compat/thread>
-#include <core/parameters/parameters.h>
-#include <core/producer/frame/basic_frame.h>
-#include <core/producer/frame/frame_factory.h>
-#include <core/mixer/write_frame.h>
-#include <common/utility/string.h>
-#include <common/log/log.h>
-#else
 #include <core/frame/draw_frame.h>
 #include <core/frame/pixel_format.h>
 #include <core/frame/audio_channel_layout.h>
@@ -55,7 +46,6 @@
 #include <common/future.h>
 #include <core/help/help_sink.h>
 #include <core/help/help_repository.h>
-#endif
 #include <core/video_format.h>
 #include <common/env.h>
 #include <common/diagnostics/graph.h>
@@ -64,38 +54,22 @@ using namespace boost::assign;
 
 namespace caspar { namespace replay {
 
-#ifndef CASPAR_2_1
-struct replay_producer : public core::frame_producer
-#else
 struct replay_producer : public core::frame_producer_base
-#endif
 {	
 	core::monitor::subject					monitor_subject_;
 
 	const std::wstring						filename_;
-#ifndef CASPAR_2_1
-	safe_ptr<core::basic_frame>				frame_;
-	safe_ptr<core::basic_frame>				last_frame_;
-	std::queue<std::pair<safe_ptr<core::basic_frame>, uint64_t>>	frame_buffer_;
-#else
 	core::draw_frame						frame_;
 	core::draw_frame						last_frame_;
 	std::queue<std::pair<core::draw_frame, uint64_t>>	frame_buffer_;
 	core::constraints						constraints_;
-#endif
 	bool									frame_stable_;
 	mjpeg_file_handle						in_file_;
 	mjpeg_file_handle						in_idx_file_;
 
-#ifndef CASPAR_2_1
-	boost::shared_ptr<mjpeg_file_header>	index_header_;
-	boost::shared_ptr<mjpeg_file_header_ex>	index_header_ex_;
-	const safe_ptr<core::frame_factory>		frame_factory_;
-#else
 	spl::shared_ptr<mjpeg_file_header>		index_header_;
 	spl::shared_ptr<mjpeg_file_header_ex>	index_header_ex_;
 	const spl::shared_ptr<core::frame_factory> frame_factory_;
-#endif
 	tbb::atomic<uint64_t>					framenum_;
 	tbb::atomic<uint64_t>					real_framenum_;
 	tbb::atomic<uint64_t>					real_last_framenum_;
@@ -115,28 +89,10 @@ struct replay_producer : public core::frame_producer_base
 	int										frame_multiplier_;
 	bool									reverse_;
 	bool									seeked_;
-#ifndef CASPAR_2_1
-	const safe_ptr<diagnostics::graph>		graph_;
-#else
 	const spl::shared_ptr<diagnostics::graph> graph_;
-#endif
 	std::thread*							decoder_;
 
 #pragma warning(disable:4244)
-#ifndef CASPAR_2_1
-	explicit replay_producer(
-			const safe_ptr<core::frame_factory>& frame_factory,
-			const std::wstring& filename,
-			const int sign,
-			const long long start_frame,
-			const long long last_frame,
-			const float start_speed,
-			const int audio = 0) 
-		: filename_(filename)
-		, frame_(core::basic_frame::empty())
-		, last_frame_(core::basic_frame::empty())
-		, frame_factory_(frame_factory)
-#else
 	explicit replay_producer(
 			const spl::shared_ptr<core::frame_factory>& frame_factory,
 			const std::wstring& filename,
@@ -149,7 +105,6 @@ struct replay_producer : public core::frame_producer_base
 		, frame_(core::draw_frame::empty())
 		, last_frame_(core::draw_frame::empty())
 		, frame_factory_(frame_factory)
-#endif
 	{
 		in_file_ = safe_fopen((filename_).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE);
 		if (in_file_ != NULL)
@@ -167,21 +122,13 @@ struct replay_producer : public core::frame_producer_base
 						mjpeg_file_header* header;
 						mjpeg_file_header_ex* header_ex;
 						read_index_header(in_idx_file_, &header);
-#ifndef CASPAR_2_1
-						index_header_ = boost::shared_ptr<mjpeg_file_header>(header);
-#else
 						index_header_ = spl::shared_ptr<mjpeg_file_header>(header);
-#endif
 						CASPAR_LOG(info) << print() << L" File starts at: " << boost::posix_time::to_iso_wstring(index_header_->begin_timecode);
 
 						if (index_header_->version >= 2)
 						{
 							read_index_header_ex(in_idx_file_, &header_ex);
-#ifndef CASPAR_2_1
-							index_header_ex_ = boost::shared_ptr<mjpeg_file_header_ex>(header_ex);
-#else
 							index_header_ex_ = spl::shared_ptr<mjpeg_file_header_ex>(header_ex);
-#endif
 
 							CASPAR_LOG(info) << print() << L" File contains " << index_header_ex_->audio_channels << L" audio channels.";
 						}
@@ -273,11 +220,7 @@ struct replay_producer : public core::frame_producer_base
 					}
 					else
 					{
-#ifndef CASPAR_2_1
-						boost::this_thread::sleep(boost::posix_time::milliseconds(10));
-#else
 						std::this_thread::sleep_for(std::chrono::milliseconds(10));
-#endif
 					}
 				}
 			}
@@ -295,80 +238,39 @@ struct replay_producer : public core::frame_producer_base
 	}
 
 #pragma warning(default:4244)
-#ifndef CASPAR_2_1
-	caspar::safe_ptr<core::basic_frame> make_frame(uint8_t* frame_data, uint32_t size, uint32_t width, uint32_t height, bool drop_first_line,
-		const int32_t* audio_data = 0, uint32_t audio_data_length = 0)
-#else
 	core::draw_frame make_frame(uint8_t* frame_data, uint32_t size, uint32_t width, uint32_t height, bool drop_first_line,
 		const int32_t* audio_data = 0, uint32_t audio_data_length = 0)
-#endif
 	{
 		core::pixel_format_desc desc;
-#ifndef CASPAR_2_1
-		desc.pix_fmt = core::pixel_format::rgb;
-#else
 		desc.format = core::pixel_format::rgb;
-#endif
 		desc.planes.push_back(core::pixel_format_desc::plane((int)width, (int)height, 3));
 
-#ifndef CASPAR_2_1
-		auto frame = frame_factory_->create_frame(this, desc, caspar::core::channel_layout::stereo());
-#else
 		auto frame = frame_factory_->create_frame(this, desc, *core::audio_channel_layout_repository::get_default()->get_layout(L"stereo"));
-#endif
 		if (!drop_first_line)
 		{
-#ifndef CASPAR_2_1
-			std::copy_n(frame_data, size, frame->image_data().begin());
-#else
 			std::copy_n(frame_data, size, frame.image_data().begin());
-#endif
 		}
 		else
 		{
 			uint32_t line = width * 3;
-#ifndef CASPAR_2_1
-			std::copy_n(frame_data, size - line, frame->image_data().begin() + line);
-#else
 			std::copy_n(frame_data, size - line, frame.image_data().begin() + line);
-#endif
 		}
 
 		if (audio_ && audio_data_length > 0)
 		{
-#ifndef CASPAR_2_1
-			core::audio_buffer samples(audio_data, audio_data + audio_data_length/4);
-			frame->audio_data() = samples;
-#else
 			core::mutable_audio_buffer samples(audio_data, audio_data + audio_data_length/4);
 			frame.audio_data() = samples;
-#endif
 		}
 
-#ifndef CASPAR_2_1
-		frame->commit();
-		frame_ = std::move(frame);
-#else
 		frame_ = core::draw_frame(std::move(frame));
-#endif
 
 		return frame_;
 	}
 
-#ifndef CASPAR_2_1
-	virtual boost::unique_future<std::wstring> call(const std::wstring& param) override
-	{
-		boost::promise<std::wstring> promise;
-		promise.set_value(do_call(param));
-		return promise.get_future();
-
-	}
-#else
 	std::future<std::wstring> call(const std::vector<std::wstring>& param) override
 	{
 		return make_ready_future(std::move(do_call(boost::algorithm::join(param, L" "))));
 	}
-#endif
 
 	std::wstring do_call(const std::wstring& param)
 	{
@@ -699,11 +601,7 @@ struct replay_producer : public core::frame_producer_base
 #pragma warning(default:4244)
 
 	// TODO: Move the file operations and frame rendering to a separate function and put the rendered frames to a buffer
-#ifndef CASPAR_2_1
-	std::pair<safe_ptr<core::basic_frame>, uint64_t> render_frame(int hints)
-#else
 	std::pair<core::draw_frame, uint64_t> render_frame(int hints)
-#endif
 	{
 		int eof = 0;
 		if (!seeked_ && (
@@ -717,11 +615,7 @@ struct replay_producer : public core::frame_producer_base
 			//frame_ = core::basic_frame::eof(); // Uncomment this to keep a steady frame after the length has run through
 			if (frame_stable_)
 			{
-#ifndef CASPAR_2_1
-				return std::make_pair(disable_audio(frame_), framenum_);
-#else
 				return std::make_pair(core::draw_frame::still(frame_), framenum_);
-#endif
 			}
 		}
 		seeked_ = false;
@@ -892,25 +786,13 @@ struct replay_producer : public core::frame_producer_base
 		return std::make_pair(frame_, framenum_);
 	}
 
-#ifndef CASPAR_2_1
-	virtual safe_ptr<core::basic_frame> receive(int hint) override
-#else
 	core::draw_frame receive_impl() override
-#endif
 	{
-#ifndef CASPAR_2_1
-		safe_ptr<core::basic_frame> frame;
-#else
 		auto frame = core::draw_frame::late();
-#endif
 
 		if (frame_buffer_.size() < 1)
 		{
-#ifndef CASPAR_2_1
-			graph_->set_tag("underflow");
-#else
 			graph_->set_tag(caspar::diagnostics::tag_severity::WARNING, "underflow");
-#endif
 			frame = last_frame_;	// repeat last frame
 		}
 		else
@@ -927,17 +809,10 @@ struct replay_producer : public core::frame_producer_base
 		return frame;
 	}
 		
-#ifndef CASPAR_2_1
-	virtual safe_ptr<core::basic_frame> last_frame() const override
-	{
-		return disable_audio(last_frame_);
-	}
-#else
 	core::draw_frame last_frame() override
 	{
 		return core::draw_frame::still(last_frame_);
 	}
-#endif
 
 #pragma warning (disable: 4244)
 	virtual uint32_t nb_frames() const override
@@ -1001,7 +876,6 @@ struct replay_producer : public core::frame_producer_base
 			safe_fclose(in_idx_file_);
 	}
 
-#ifdef CASPAR_2_1
 	std::wstring name() const override
 	{
 		return L"replay";
@@ -1011,10 +885,8 @@ struct replay_producer : public core::frame_producer_base
 	{
 		return constraints_;
 	}
-#endif
 };
 
-#ifdef CASPAR_2_1
 core::draw_frame create_thumbnail(const core::frame_producer_dependencies& dependencies, const std::wstring& media_file)
 {
     return core::draw_frame::empty();
@@ -1028,20 +900,11 @@ void describe_producer(core::help_sink & sink, const core::help_repository & rep
 	sink.syntax(L"PLAY ");
 	sink.para()->text(L"Reads replay file.");
 }
-#endif
 
-#ifndef CASPAR_2_1
-safe_ptr<core::frame_producer> create_producer(const safe_ptr<core::frame_factory>& frame_factory, const core::parameters& params)
-#else
 spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer_dependencies& dependencies, const std::vector<std::wstring>& params)
-#endif
 {
 	static const std::vector<std::wstring> extensions = list_of(L"mav");
-#ifndef CASPAR_2_1
-	std::wstring filename = env::media_folder() + L"\\" + params[0];
-#else
         std::wstring filename = env::media_folder() + params.at(0);
-#endif
 	
 	auto ext = std::find_if(extensions.begin(), extensions.end(), [&](const std::wstring& ex) -> bool
 		{					
@@ -1076,11 +939,7 @@ spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer
 					}
 					if(!what["VALUE"].str().empty())
 					{
-#ifndef CASPAR_2_1
-						start_frame = boost::lexical_cast<unsigned long long>(narrow(what["VALUE"].str()).c_str());
-#else
 						start_frame = boost::lexical_cast<unsigned long long>(what["VALUE"].str());
-#endif
 					}
 				}
 			}
@@ -1123,14 +982,8 @@ spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer
 		}
 	}
 
-#ifndef CASPAR_2_1
-	return create_producer_print_proxy(
-			make_safe<replay_producer>(frame_factory, filename + L"." + *ext, sign, start_frame, last_frame, start_speed, audio));
-#else
 	//return spl::make_shared_ptr(std::make_shared<replay_producer>(dependencies.frame_factory, filename + L"." + *ext, sign, start_frame, last_frame, start_speed, audio));
 	return spl::make_shared<replay_producer>(dependencies.frame_factory, filename + L"." + *ext, sign, start_frame, last_frame, start_speed, audio);
-
-#endif
 }
 
 }}

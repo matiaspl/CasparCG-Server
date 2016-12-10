@@ -30,14 +30,10 @@
 #include <jpeglib.h>
 #include <core/producer/frame_producer.h>
 #include <core/consumer/frame_consumer.h>
-#ifndef CASPAR_2_1
-#include <core/parameters/parameters.h>
-#include <common/utility/string.h>
-#else
 #include <core/module_dependencies.h>
 #include <core/producer/media_info/media_info.h>
 #include <core/frame/draw_frame.h>
-#endif
+
 namespace caspar { namespace replay {
 
 #ifndef JCS_EXTENSIONS
@@ -53,11 +49,7 @@ void JPEGVersionError(j_common_ptr cinfo)
 	jpeg_version = cinfo->err->msg_parm.i[0];
 }
 
-#ifndef CASPAR_2_1
-void init()
-#else
 void init(core::module_dependencies dependencies)
-#endif
 {
 	jpeg_compress_struct cinfo;
 	jpeg_error_mgr error_mgr;
@@ -85,10 +77,6 @@ void init(core::module_dependencies dependencies)
 
 	CASPAR_LOG(info) << "[replay] Using libjpeg" << (jpeg_is_turbo == 1 ? "-turbo" : "") << " version " << jpeg_version;
 
-#ifndef CASPAR_2_1
-	core::register_consumer_factory([](const core::parameters& params){return replay::create_consumer(params);});
-	core::register_producer_factory(create_producer);
-#else
 	dependencies.consumer_registry->register_consumer_factory(L"Replay Consumer", create_consumer, describe_consumer);
 	dependencies.producer_registry->register_producer_factory(L"Replay Producer", create_producer, describe_producer);
     dependencies.producer_registry->register_thumbnail_producer(create_thumbnail);
@@ -104,7 +92,6 @@ void init(core::module_dependencies dependencies)
 
         return false;
     });
-#endif
 }
 
 std::wstring get_version()

@@ -27,16 +27,6 @@
 #include "../util/frame_operations.h"
 #include "../util/file_operations.h"
 
-#ifndef CASPAR_2_1
-#include <common/concurrency/executor.h>
-#include <common/env.h>
-#include <common/concurrency/future_util.h>
-#include <common/diagnostics/graph.h>
-#include <core/parameters/parameters.h>
-#include <core/consumer/frame_consumer.h>
-#include <core/mixer/read_frame.h>
-#include <boost/algorithm/string.hpp>
-#else
 #include <core/frame/frame.h>
 #include <common/executor.h>
 #include <common/env.h>
@@ -51,7 +41,6 @@
 #include <boost/thread.hpp>
 #include <boost/thread/locks.hpp>
 #include <tbb/concurrent_queue.h>
-#endif
 #include <boost/timer.hpp>
 
 namespace caspar { namespace replay {
@@ -70,21 +59,13 @@ struct replay_consumer : public core::frame_consumer
 	mjpeg_file_handle						output_index_file_;
 	bool									file_open_;
 	executor								encode_executor_;
-#ifndef CASPAR_2_1
-	const safe_ptr<diagnostics::graph>		graph_;
-#else
 	spl::shared_ptr<diagnostics::graph>		graph_;
-#endif
 	mjpeg_process_mode						mode_;
 	boost::posix_time::ptime				start_timecode_;
 
 	int										audio_channels_;
 
-#ifndef CASPAR_2_1
-	tbb::atomic<int64_t>					current_encoding_delay_;
-#else
 	int64_t							current_encoding_delay_;
-#endif
 
 #define REPLAY_FRAME_BUFFER					32
 #define REPLAY_JPEG_QUALITY					90
@@ -116,11 +97,7 @@ public:
 		file_open_ = false;
 	}
 
-#ifndef CASPAR_2_1
-	virtual void initialize(const core::video_format_desc& format_desc, const core::channel_layout& audio_channel_layout, int)
-#else
 	virtual void initialize(const core::video_format_desc& format_desc, const core::audio_channel_layout& audio_channel_layout, int)
-#endif
 	{
 		format_desc_ = format_desc;
 
@@ -164,11 +141,7 @@ public:
 	}
 
 #pragma warning(disable: 4701)
-#ifndef CASPAR_2_1
-	void encode_video_frame(core::read_frame& frame)
-#else
 	void encode_video_frame(core::const_frame frame)
-#endif
 	{
 		auto format_desc = format_desc_;
 		auto out_file = output_file_;
@@ -209,18 +182,10 @@ public:
 
 	void mark_dropped()
 	{
-#ifndef CASPAR_2_1
-		graph_->set_tag("dropped-frame");
-#else
 		graph_->set_tag(caspar::diagnostics::tag_severity::WARNING, "dropped-frame");
-#endif
 	}
 
-#ifndef CASPAR_2_1
-	virtual boost::unique_future<bool> send(const safe_ptr<core::read_frame>& frame) override
-#else
 	std::future<bool> send(core::const_frame frame) override
-#endif
 	{
 		if (file_open_)
 		{
@@ -230,20 +195,12 @@ public:
 				{
 					boost::timer frame_timer;
 
-#ifndef CASPAR_2_1
-					encode_video_frame(*frame);
-#else
 					encode_video_frame(frame);
-#endif
 
 					graph_->set_text(print());
 					graph_->set_value("frame-time", frame_timer.elapsed()*0.5*format_desc_.fps);
 
-#ifndef CASPAR_2_1
-					current_encoding_delay_ = frame->get_age_millis();
-#else
 					current_encoding_delay_ = frame.get_age_millis();
-#endif
 
 					monitor_subject_ << core::monitor::message("/profiler/time") % frame_timer.elapsed() % (1.0 / format_desc_.fps);
 
@@ -261,11 +218,7 @@ public:
 			graph_->set_value("buffered-video", (double)encode_executor_.size() / (double)encode_executor_.capacity());
 		}
 
-#ifndef CASPAR_2_1
-		return wrap_as_future(true);
-#else
 		return make_ready_future(true);
-#endif
 	}
 
 	virtual int64_t presentation_frame_age_millis() const override
@@ -322,15 +275,12 @@ public:
 		CASPAR_LOG(info) << print() << L" Successfully Uninitialized.";
 	}
 
-#ifdef CASPAR_2_1
 	std::wstring name() const override
 	{
 		return L"replay";
 	}
-#endif
 };
 
-#ifdef CASPAR_2_1
 void describe_consumer(core::help_sink & sink, const core::help_repository & repo)
 {
 	CASPAR_LOG(error) << L" describe_consumer ";
@@ -339,14 +289,9 @@ void describe_consumer(core::help_sink & sink, const core::help_repository & rep
 	sink.syntax(L"REPLAY ");
 	sink.para()->text(L"Writes replay file.");
 }
-#endif
 
-#ifndef CASPAR_2_1
-safe_ptr<core::frame_consumer> create_consumer(const core::parameters& params)
-#else
 spl::shared_ptr<core::frame_consumer> create_consumer(
 	const std::vector<std::wstring>& params, core::interaction_sink*, std::vector<spl::shared_ptr<core::video_channel>> channels)
-#endif
 {
 	if (params.size() < 1 || !boost::iequals(params[0], L"REPLAY"))
 		return core::frame_consumer::empty();
@@ -394,11 +339,7 @@ spl::shared_ptr<core::frame_consumer> create_consumer(
 		}
 	}
 
-#ifndef CASPAR_2_1
-	return make_safe<replay_consumer>(filename, quality, subsampling, 2);
-#else
 	return spl::make_shared<replay_consumer>(filename, quality, subsampling, 2);
-#endif
 }
 
 }}

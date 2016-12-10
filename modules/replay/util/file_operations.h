@@ -36,11 +36,7 @@
 
 #ifndef REPLAY_IO_WINAPI
 
-#ifndef CASPAR_2_1
-#include "common/utility/utf8conv.h"
-#else
 #include "common/utf.h"
-#endif
 
 #define _FILE_OFFSET_BITS  64
 
@@ -99,11 +95,7 @@ namespace caspar { namespace replay {
 		uint32_t						width;
 		uint32_t						height;
 		double							fps;
-#ifndef CASPAR_2_1
-		caspar::core::field_mode::type	field_mode;
-#else
 		caspar::core::field_mode		field_mode;
-#endif
 		boost::posix_time::ptime		begin_timecode;
 	};
 

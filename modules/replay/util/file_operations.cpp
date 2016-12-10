@@ -29,16 +29,8 @@
 #include <setjmp.h>
 
 #include <common/env.h>
-#ifndef CASPAR_2_1
-#include <common/log/log.h>
-#include <common/utility/string.h>
-#include <common/concurrency/future_util.h>
-#endif
 #include <common/diagnostics/graph.h>
 #include <core/consumer/frame_consumer.h>
-#ifndef CASPAR_2_1
-#include <core/mixer/read_frame.h>
-#endif
 
 #define VIDEO_OUTPUT_BUF_SIZE		4096
 #define VIDEO_INPUT_BUF_SIZE		4096
@@ -89,17 +81,10 @@ namespace caspar { namespace replay {
 			return NULL;
 		}
 #else
-#ifndef CASPAR_2_1
-		if (mode == GENERIC_WRITE)
-			return fopen64(utf8util::UTF8FromUTF16(filename).c_str(), "wb");
-		else
-			return fopen64(utf8util::UTF8FromUTF16(filename).c_str(), "rb");
-#else
                 if (mode == GENERIC_WRITE)
                         return fopen64(u8(filename).c_str(), "wb");
                 else
                         return fopen64(u8(filename).c_str(), "rb");
-#endif
 #endif
 	}
 #pragma warning(default:4706)

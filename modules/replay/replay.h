@@ -24,17 +24,11 @@
 #pragma once
 
 #include <string>
-#ifdef CASPAR_2_1
 #include <core/module_dependencies.h>
-#endif
 
 namespace caspar { namespace replay {
 
-#ifndef CASPAR_2_1
-	void init();
-#else
 	void init(core::module_dependencies dependencies);
-#endif
 	std::wstring get_version();
 
 }}
