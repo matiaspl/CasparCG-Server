@@ -388,7 +388,7 @@ struct replay_producer : public core::frame_producer_base
 	void set_playback_speed(float speed)
 	{
 		speed_ = speed;
-		abs_speed_ = abs(speed);
+		abs_speed_ = fabs(speed);
 		if (speed != 0.0f)
 			frame_divider_ = abs((int)(1.0f / speed));
 		else 
