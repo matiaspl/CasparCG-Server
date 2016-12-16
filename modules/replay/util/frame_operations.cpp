@@ -34,6 +34,7 @@
 
 namespace caspar { namespace replay {
 
+/*
 #pragma warning(disable:4309)
 	void bgra_to_rgb(const mmx_uint8_t* src, mmx_uint8_t* dst, int line_width)
 	{
@@ -97,7 +98,9 @@ l1:
 #endif
 	}
 #pragma warning(default:4309)
+*/
 
+/*
 #pragma warning(disable:4309)
 	void rgb_to_bgra(const mmx_uint8_t* src, mmx_uint8_t* dst, int line_width)
 	{
@@ -119,11 +122,11 @@ l1:
 
 		while (line_width-- > 0)
 		{
-			/*             0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15
-			 * in_vec[0]   Ra Ga Ba Rb Gb Bb Rc Gc Bc Rd Gd Bd Re Ge Be Rf
-			 * in_vec[1]   Gg Bg Rh Gh Bh Ri Gi Bi Rj Gj Bj Rk Gk Bk Rl Gl
-			 * in_vec[2]   Bl Rm Gm Bm Rn Gn Bn Ro Go Bo Rp Gp Bp Rq Gq Bq
-			 */
+            //             0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15
+            // in_vec[0]   Ra Ga Ba Rb Gb Bb Rc Gc Bc Rd Gd Bd Re Ge Be Rf
+            // in_vec[1]   Gg Bg Rh Gh Bh Ri Gi Bi Rj Gj Bj Rk Gk Bk Rl Gl
+            // in_vec[2]   Bl Rm Gm Bm Rn Gn Bn Ro Go Bo Rp Gp Bp Rq Gq Bq
+
 			__m128i in1, in2, in3;
 			__m128i out;
 
@@ -161,8 +164,10 @@ l1:
 #endif
 	}
 #pragma warning(default:4309)
+*/
 
-	void split_frame_to_fields(const mmx_uint8_t* src, mmx_uint8_t* dst1, mmx_uint8_t* dst2, uint32_t width, uint32_t height, uint32_t stride)
+/*
+    void split_frame_to_fields(const mmx_uint8_t* src, mmx_uint8_t* dst1, mmx_uint8_t* dst2, uint32_t width, uint32_t height, uint32_t stride)
 	{
 		uint32_t full_row = width * stride;
 		tbb::parallel_for(tbb::blocked_range<uint32_t>(0, height/2), [=](const tbb::blocked_range<uint32_t>& r)
@@ -173,7 +178,8 @@ l1:
 				memcpy((dst2 + i * full_row), (src + (i * 2 + 1) * full_row), full_row);
 			}
 		});
-	}
+    }
+*/
 
 	void interlace_fields(const mmx_uint8_t* src1, const mmx_uint8_t* src2, mmx_uint8_t* dst, uint32_t width, uint32_t height, uint32_t stride)
 	{
@@ -188,7 +194,7 @@ l1:
 		});
 	}
 
-	void interlace_frames(const mmx_uint8_t* src1, const mmx_uint8_t* src2, mmx_uint8_t* dst, uint32_t width, uint32_t height, uint32_t stride)
+    void interlace_frames(const mmx_uint8_t* src1, const mmx_uint8_t* src2, mmx_uint8_t* dst, uint32_t width, uint32_t height, uint32_t stride)
 	{
 		uint32_t full_row = width * stride;
 		tbb::parallel_for(tbb::blocked_range<uint32_t>(0, height/2), [=](const tbb::blocked_range<uint32_t>& r)
@@ -199,7 +205,7 @@ l1:
 				memcpy((dst + (i * 2 + 1) * full_row), (src2 + (i * 2 + 1) * full_row), full_row);
 			}
 		});
-	}
+    }
 	
 	void field_double(const mmx_uint8_t* src, mmx_uint8_t* dst, uint32_t width, uint32_t height, uint32_t stride)
 	{
@@ -211,7 +217,7 @@ l1:
 				memcpy((dst + i * 2 * full_row), (src + i * full_row), full_row);
 				memcpy((dst + (i * 2 + 1) * full_row), (src + i  * full_row), full_row);
 			}
-		}); */
+        }); */
 		tbb::parallel_for(tbb::blocked_range<uint32_t>(0, height/2 - 1), [=](const tbb::blocked_range<uint32_t>& r)
 		{
 			for (auto i = r.begin(); i != r.end(); ++i)
@@ -256,7 +262,7 @@ l1:
 			 * in_vec[0]   Ra Ga Ba Rb Gb Bb Rc Gc     
 			 * in_vec[1]   Bc Rd Gd Bd Re Ge Be Rf 
 			 * in_vec[2]   Gg Bg Rh Gh Bh Ri Gi Bi
-			 */
+             */
 
 			in1 = _mm_loadl_epi64((__m128i*)&in1_vec[0]);
 			in2 = _mm_loadl_epi64((__m128i*)&in2_vec[0]);
@@ -298,7 +304,7 @@ l1:
 #endif
 	}
 
-	void black_frame(mmx_uint8_t* dst, uint32_t width, uint32_t height, uint32_t stride)
+    void black_frame(mmx_uint8_t* dst, uint32_t width, uint32_t height, uint32_t stride)
 	{
 		uint32_t full_size = width * height;
 		tbb::parallel_for(tbb::blocked_range<uint32_t>(0, full_size), [=](const tbb::blocked_range<uint32_t>& r)

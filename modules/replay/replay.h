@@ -29,6 +29,5 @@
 namespace caspar { namespace replay {
 
 	void init(core::module_dependencies dependencies);
-	std::wstring get_version();
 
 }}

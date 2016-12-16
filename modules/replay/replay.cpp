@@ -49,34 +49,39 @@ void JPEGVersionError(j_common_ptr cinfo)
 	jpeg_version = cinfo->err->msg_parm.i[0];
 }
 
+std::wstring libjpeg_version()
+{
+    jpeg_compress_struct cinfo;
+    jpeg_error_mgr error_mgr;
+    error_mgr.error_exit = &JPEGVersionError;
+    cinfo.err = &error_mgr;
+
+    jpeg_create_compress(&cinfo);
+    cinfo.input_components = 3;
+    jpeg_set_defaults(&cinfo);
+    cinfo.in_color_space = JCS_EXT_RGB;
+    try
+    {
+        jpeg_default_colorspace(&cinfo);
+        if (jpeg_version == -1)
+        {
+            jpeg_is_turbo = 1;
+            jpeg_destroy_compress(&cinfo);
+        }
+    }
+    catch (...)
+    {
+        CASPAR_LOG(error) << "[replay] JPEG lib test exception";
+    }
+    jpeg_CreateCompress(&cinfo, -1, sizeof(cinfo)); // Pass version = -1 to always force error
+
+    std::wstringstream str;
+    str << L"libjpeg" << (jpeg_is_turbo == 1 ? L"-turbo " : L" ") << jpeg_version;
+    return str.str();
+}
+
 void init(core::module_dependencies dependencies)
 {
-	jpeg_compress_struct cinfo;
-	jpeg_error_mgr error_mgr;
-	error_mgr.error_exit = &JPEGVersionError;
-	cinfo.err = &error_mgr;
-
-	jpeg_create_compress(&cinfo);
-	cinfo.input_components = 3;
-	jpeg_set_defaults(&cinfo);
-	cinfo.in_color_space = JCS_EXT_RGB;
-	try
-	{
-		jpeg_default_colorspace(&cinfo);
-		if (jpeg_version == -1)
-		{
-			jpeg_is_turbo = 1;
-			jpeg_destroy_compress(&cinfo);
-		}
-	}
-	catch (...)
-	{
-		CASPAR_LOG(error) << "[replay] JPEG lib test exception";
-	}
-	jpeg_CreateCompress(&cinfo, -1, sizeof(cinfo)); // Pass version = -1 to always force error
-
-	CASPAR_LOG(info) << "[replay] Using libjpeg" << (jpeg_is_turbo == 1 ? "-turbo" : "") << " version " << jpeg_version;
-
 	dependencies.consumer_registry->register_consumer_factory(L"Replay Consumer", create_consumer, describe_consumer);
 	dependencies.producer_registry->register_producer_factory(L"Replay Producer", create_producer, describe_producer);
     dependencies.producer_registry->register_thumbnail_producer(create_thumbnail);
@@ -92,11 +97,10 @@ void init(core::module_dependencies dependencies)
 
         return false;
     });
-}
-
-std::wstring get_version()
-{
-	return L"0.1-beta";
+    dependencies.system_info_provider_repo->register_system_info_provider([](boost::property_tree::wptree& info)
+    {
+        info.add(L"system.replay.libjpeg.version", libjpeg_version());
+    });
 }
 
 }}
