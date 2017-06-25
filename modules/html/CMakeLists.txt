@@ -42,7 +42,7 @@ else()
 		core
 
 		cef
-		cef_dll_wrapper
+		libcef_dll_wrapper
 	)
 endif()
 
