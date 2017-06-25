@@ -453,12 +453,16 @@ public:
 
 			CefWindowInfo window_info;
 
-			window_info.SetTransparentPainting(true);
-			window_info.SetAsOffScreen(nullptr);
-			//window_info.SetAsWindowless(nullptr, true);
+			window_info.SetAsWindowless(0, true);
 
 			CefBrowserSettings browser_settings;
 			browser_settings.web_security = cef_state_t::STATE_DISABLED;
+			browser_settings.webgl = cef_state_t::STATE_ENABLED;
+			double fps = format_desc.fps;
+			if (format_desc.field_mode != core::field_mode::progressive) {
+				fps *= 2.0;
+			}
+			browser_settings.windowless_frame_rate = int(ceil(fps));
 			CefBrowserHost::CreateBrowser(window_info, client_.get(), url, browser_settings, nullptr);
 		});
 	}
