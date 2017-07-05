@@ -453,7 +453,7 @@ public:
 
 			CefWindowInfo window_info;
 
-			window_info.SetAsWindowless(0, true);
+			window_info.SetAsWindowless(0);
 
 			CefBrowserSettings browser_settings;
 			browser_settings.web_security = cef_state_t::STATE_DISABLED;
