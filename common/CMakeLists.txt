@@ -130,6 +130,7 @@ else ()
 	target_link_libraries(common
 		boost_system
 		boost_thread
+		boost_timer
 		boost_chrono
 		boost_filesystem
 		boost_log

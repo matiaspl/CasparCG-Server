@@ -47,7 +47,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/timer.hpp>
+#include <boost/timer/timer.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/ptree.hpp>
 
@@ -79,9 +79,8 @@ class html_client
 {
 	std::wstring							url_;
 	spl::shared_ptr<diagnostics::graph>		graph_;
-	boost::timer							tick_timer_;
-	boost::timer							frame_timer_;
-	boost::timer							paint_timer_;
+	boost::timer::cpu_timer							tick_timer_;
+	boost::timer::cpu_timer							paint_timer_;
 
 	spl::shared_ptr<core::frame_factory>	frame_factory_;
 	core::video_format_desc					format_desc_;
@@ -188,6 +187,12 @@ private:
 		return true;
 	}
 
+	double GetTimerElapsed(boost::timer::cpu_timer timer)
+	{
+		boost::timer::nanosecond_type elapsed = timer.elapsed().wall;
+		return elapsed / 1000000000.0;
+	}
+
 	void OnPaint(
 			CefRefPtr<CefBrowser> browser,
 			PaintElementType type,
@@ -196,11 +201,11 @@ private:
 			int width,
 			int height)
 	{
-		graph_->set_value("browser-tick-time", paint_timer_.elapsed()
+		graph_->set_value("browser-tick-time", GetTimerElapsed(paint_timer_)
 				* format_desc_.fps
 				* format_desc_.field_count
 				* 0.5);
-		paint_timer_.restart();
+		paint_timer_.start();
 		CASPAR_ASSERT(CefCurrentlyOn(TID_UI));
 
 		core::pixel_format_desc pixel_desc;
@@ -304,11 +309,11 @@ private:
 					CefProcessId::PID_RENDERER,
 					CefProcessMessage::Create(TICK_MESSAGE_NAME));
 
-		graph_->set_value("tick-time", tick_timer_.elapsed()
+		graph_->set_value("tick-time", GetTimerElapsed(tick_timer_)
 				* format_desc_.fps
 				* format_desc_.field_count
 				* 0.5);
-		tick_timer_.restart();
+		tick_timer_.start();
 	}
 
 	bool try_pop(core::draw_frame& result)
