@@ -1,0 +1,25 @@
+sudo: required
+
+services:
+  - docker
+
+env:
+  matrix:
+    - PLATFORM=ubuntu-17.10
+    - PLATFORM=ubuntu-16.04
+
+script:
+  - ./build-scripts/$PLATFORM/build-one-line
+#  - if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi # This doesnt work, it needs to operate differently (perhaps before each following line?)
+  - export BUCKET_ID=$(echo $TRAVIS_BRANCH | sed -r 's/[^a-z0-9]+/-/gi')
+  - export COMMIT_COUNT=$(git rev-list --all --count)
+  - export SHORT_HASH=$(git rev-parse --short HEAD)
+  - export RESULT_NAME="CasparCG_Server_${COMMIT_COUNT}_${SHORT_HASH}_${PLATFORM}.tar.gz"
+  - cd products
+  - sudo chmod 777 . -R
+  - mv "CasparCG_Server_${PLATFORM}.tar.gz" "$RESULT_NAME"
+  - wget https://dl.minio.io/client/mc/release/linux-amd64/mc
+  - chmod +x mc
+  - ./mc -C ./ config host add minio $S3_URL $S3_ACCESS_KEY $S3_SECRET_KEY S3v4
+  - ./mc -C ./ mb minio/$BUCKET_ID || true
+  - ./mc -C ./ cp "$RESULT_NAME" minio/$BUCKET_ID

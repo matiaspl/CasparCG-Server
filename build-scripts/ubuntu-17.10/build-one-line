@@ -1,0 +1,7 @@
+#! /bin/bash
+docker build -t casparcg/server-build:ubuntu-17.10 $PWD/build-scripts/ubuntu-17.10
+
+docker run --rm -it \
+    -v $PWD:/source \
+    -v $PWD/products:/build/products \
+    casparcg/server-build:ubuntu-17.10 /bin/bash -c "cmake /source && make -j2 && /source/build-scripts/ubuntu-17.10/package"
