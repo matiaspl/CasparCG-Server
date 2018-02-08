@@ -7,5 +7,19 @@
 .vscode
 .vs
 CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
 src/version.h
 src/shell/included_modules.h
+
+src/shell/*.dll
+src/shell/*.pak
+src/shell/*.ttf
+src/shell/*.bin
+src/shell/*.dat
+
+# Cmake build dirs
+Debug
+Release
+MinSizeRel
+RelWithDebInfo
