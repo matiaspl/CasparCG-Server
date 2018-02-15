@@ -53,7 +53,8 @@ You will then find a folder called `casparcg_server` which should contain everyt
 Development
 -----------
 
-1. Install dependencies `apt-get install .... (coming soon)`
+1. Install dependencies `apt-get install cmake g++ pkgconf libtbb-dev libglew-dev libfreeimage-dev libsndfile1-dev libopenal-dev libjpeg-dev libsfml-dev libfreetype6-dev libglfw3-dev
+.... (coming soon)`
 2. Build boost and ffmpeg as per the docker images inside of `tools/linux` they should be saved in `/opt/boost` and `/opt/ffmpeg`
 3. Download CEF from the link near the top of `tools/linux/Dockerfile`, and extract to `/opt/cef`
 4. `git clone --single-branch --branch 2.2.0 https://github.com/CasparCG/server` casparcg-server-2.2.0
