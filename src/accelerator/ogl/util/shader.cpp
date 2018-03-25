@@ -32,6 +32,7 @@ struct shader::impl : boost::noncopyable
 {
     GLuint                                 program_;
     std::unordered_map<std::string, GLint> locations_;
+    std::unordered_map<std::string, GLint> attrib_locations_;
 
   public:
     impl(const std::string& vertex_source_str, const std::string& fragment_source_str)
@@ -105,6 +106,14 @@ struct shader::impl : boost::noncopyable
         return it->second;
     }
 
+    GLint get_attrib_location(const char* name)
+    {
+        auto it = attrib_locations_.find(name);
+        if (it == attrib_locations_.end())
+            it = attrib_locations_.insert(std::make_pair(name, glGetAttribLocation(program_, name))).first;
+        return it->second;
+    }
+
     void set(const std::string& name, bool value) { set(name, value ? 1 : 0); }
 
     void set(const std::string& name, int value) { GL(glUniform1i(get_location(name.c_str()), value)); }
@@ -134,6 +143,7 @@ void shader::set(const std::string& name, int value) { impl_->set(name, value); 
 void shader::set(const std::string& name, float value) { impl_->set(name, value); }
 void shader::set(const std::string& name, double value0, double value1) { impl_->set(name, value0, value1); }
 void shader::set(const std::string& name, double value) { impl_->set(name, value); }
+GLint shader::get_attrib_location(const char* name) { return impl_->get_attrib_location(name); }
 int  shader::id() const { return impl_->program_; }
 void shader::use() const { impl_->use(); }
 
