@@ -275,39 +275,39 @@ std::string get_fragment()
 				switch(pixel_format)
 				{
 				case 0:		//gray
-					return vec4(get_sample(plane[0], TexCoord.st / TexCoord.q).rrr, 1.0);
+					return vec4(get_sample(plane[0], TexCoord.st).rrr, 1.0);
 				case 1:		//bgra,
-					return get_sample(plane[0], TexCoord.st / TexCoord.q).bgra;
+					return get_sample(plane[0], TexCoord.st).bgra;
 				case 2:		//rgba,
-					return get_sample(plane[0], TexCoord.st / TexCoord.q).rgba;
+					return get_sample(plane[0], TexCoord.st).rgba;
 				case 3:		//argb,
-					return get_sample(plane[0], TexCoord.st / TexCoord.q).argb;
+					return get_sample(plane[0], TexCoord.st).argb;
 				case 4:		//abgr,
-					return get_sample(plane[0], TexCoord.st / TexCoord.q).gbar;
+					return get_sample(plane[0], TexCoord.st).gbar;
 				case 5:		//ycbcr,
 					{
-						float y  = get_sample(plane[0], TexCoord.st / TexCoord.q).r;
-						float cb = get_sample(plane[1], TexCoord.st / TexCoord.q).r;
-						float cr = get_sample(plane[2], TexCoord.st / TexCoord.q).r;
+						float y  = get_sample(plane[0], TexCoord.st).r;
+						float cb = get_sample(plane[1], TexCoord.st).r;
+						float cr = get_sample(plane[2], TexCoord.st).r;
 						return ycbcra_to_rgba(y, cb, cr, 1.0);
 					}
 				case 6:		//ycbcra
 					{
-						float y  = get_sample(plane[0], TexCoord.st / TexCoord.q).r;
-						float cb = get_sample(plane[1], TexCoord.st / TexCoord.q).r;
-						float cr = get_sample(plane[2], TexCoord.st / TexCoord.q).r;
-						float a  = get_sample(plane[3], TexCoord.st / TexCoord.q).r;
+						float y  = get_sample(plane[0], TexCoord.st).r;
+						float cb = get_sample(plane[1], TexCoord.st).r;
+						float cr = get_sample(plane[2], TexCoord.st).r;
+						float a  = get_sample(plane[3], TexCoord.st).r;
 						return ycbcra_to_rgba(y, cb, cr, a);
 					}
 				case 7:		//luma
 					{
-						vec3 y3 = get_sample(plane[0], TexCoord.st / TexCoord.q).rrr;
+						vec3 y3 = get_sample(plane[0], TexCoord.st).rrr;
 						return vec4((y3-0.065)/0.859, 1.0);
 					}
 				case 8:		//bgr,
-					return vec4(get_sample(plane[0], TexCoord.st / TexCoord.q).bgr, 1.0);
+					return vec4(get_sample(plane[0], TexCoord.st).bgr, 1.0);
 				case 9:		//rgb,
-					return vec4(get_sample(plane[0], TexCoord.st / TexCoord.q).rgb, 1.0);
+					return vec4(get_sample(plane[0], TexCoord.st).rgb, 1.0);
 				}
 				return vec4(0.0, 0.0, 0.0, 0.0);
 			}

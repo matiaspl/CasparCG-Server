@@ -364,8 +364,7 @@ struct image_kernel::impl
 
         // Draw
         switch (params.geometry.type()) {
-            case core::frame_geometry::geometry_type::quad:
-            case core::frame_geometry::geometry_type::quad_list: {
+            case core::frame_geometry::geometry_type::triangles: {
 
                 GLuint vao;
                 GLuint vbo;
@@ -394,7 +393,7 @@ struct image_kernel::impl
                 GL(glVertexAttribPointer(vtx_loc, 2, GL_DOUBLE, GL_FALSE, stride, nullptr));
                 GL(glVertexAttribPointer(tex_loc, 4, GL_DOUBLE, GL_FALSE, stride, nullptr));
 
-                for (int i = 0; i < coords.size(); i += 4) {
+                for (int i = 0; i < coords.size(); i += 3) {
                     GL(glDrawArrays(GL_TRIANGLES, i, 3));
                     GL(glTextureBarrier());
                 }
